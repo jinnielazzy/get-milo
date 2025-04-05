@@ -3,7 +3,8 @@ import axios from 'axios';
 
 const API_URL = 'https://api.douyin.wtf/api/douyin/web/fetch_user_post_videos';
 const SEC_USER_ID = 'MS4wLjABAAAAo0hDbJvN_-xEvV3BP6mQJ7azqbhmErfLoPcQES5Lkq4';
-const SAVE_PATH = '/videos/latest.mp4'; // overwrite this file every time
+const VIDEO_SAVE_PATH = '/videos/latest.mp4'; // overwrite this file every time
+const AUDIO_SAVE_PATH = '/audios/latest.mp3'; // overwrite this file every time
 
 async function main() {
   try {
@@ -12,18 +13,25 @@ async function main() {
       headers: { accept: 'application/json' },
     });
 
-    const video = response.data?.data?.aweme_list?.[0];
-    const url = video?.video?.play_addr?.url_list?.[0];
-
-    if (!url) {
-      console.warn('⚠️ No video URL found.');
+    const videos = response.data?.data?.aweme_list;
+    const latestVideo = videos[videos.length - 1];
+    if (!latestVideo) {
+      console.warn('⚠️ No videos found.');
       return;
     }
 
-    console.log(`📥 Downloading latest video from ${url}`);
-    const res = await axios.get(url, { responseType: 'stream' });
+    const audioUrl = latestVideo?.music.play_url.url_list[0];
+    const videoUrl = latestVideo?.video.play_addr.url_list[0];
 
-    const file = (await fs.open(SAVE_PATH, 'w')).createWriteStream();
+    if (!videoUrl || !audioUrl) {
+      console.warn('⚠️ No video or audio URL found.');
+      return;
+    }
+
+    console.log(`📥 Downloading latest video from ${videoUrl}`);
+    let res = await axios.get(videoUrl, { responseType: 'stream' });
+
+    let file = (await fs.open(VIDEO_SAVE_PATH, 'w')).createWriteStream();
     res.data.pipe(file);
 
     await new Promise((resolve, reject) => {
@@ -31,7 +39,20 @@ async function main() {
       file.on('error', reject);
     });
 
-    console.log('✅ Video saved as latest.mp4');
+    console.log('✅ Video saved as latest.mp3');
+
+    console.log(`📥 Downloading latest audio from ${audioUrl}`);
+    res = await axios.get(audioUrl, { responseType: 'stream' });
+
+    file = (await fs.open(AUDIO_SAVE_PATH, 'w')).createWriteStream();
+    res.data.pipe(file);
+
+    await new Promise((resolve, reject) => {
+      file.on('finish', resolve);
+      file.on('error', reject);
+    });
+
+    console.log('✅ Audio saved as latest.mp3');
   } catch (err) {
     console.error('❌ Error:', err.message);
   }
